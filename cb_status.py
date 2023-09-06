@@ -4,7 +4,8 @@ import tornado.escape
 import tornado.gen
 import tornado.httpclient
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
-from txcouchbase.bucket import Bucket
+
+# from txcouchbase.bucket import Bucket
 
 import settings
 
@@ -23,10 +24,12 @@ user = settings.USERNAME
 password = settings.PASSWORD
 
 aws = settings.AWS
-bucket = Bucket('couchbase://{0}/{1}'.format(",".join(BOOTSTRAP_NODES),
-                                             bucket_name),
-                username=user,
-                password=password)
+
+# bucket = Bucket('couchbase://{0}/{1}'.format(",".join(BOOTSTRAP_NODES),
+#                                              bucket_name),
+#                 username=user,
+#                 password=password)
+
 http_client = AsyncHTTPClient()
 
 
@@ -36,20 +39,24 @@ def get_image_for_product(product):
 
 
 @tornado.gen.coroutine
-def get_url(endpoint, host_list=bucket.server_nodes, raise_exception=False):
+def get_url(endpoint, host_list=BOOTSTRAP_NODES, raise_exception=False):
     exceptions = []
     while True:
         for host in host_list:
-            host = "http://" + host
+            host = "http://" + host + ":8091"
             target_url = host + endpoint
             request = HTTPRequest(
                 url=target_url,
                 auth_username=USERNAME,
                 auth_password=PASSWORD,
-                auth_mode='basic', request_timeout=0.3)
+                auth_mode="basic",
+                request_timeout=0.3,
+            )
             try:
                 response = yield http_client.fetch(request)
-                raise tornado.gen.Return((tornado.escape.json_decode(response.body), host))
+                raise tornado.gen.Return(
+                    (tornado.escape.json_decode(response.body), host)
+                )
             except tornado.httpclient.HTTPError as e:
                 print(("Could not retrieve URL: " + str(target_url) + str(e)))
                 exceptions.append(e)
@@ -69,44 +76,54 @@ def get_node_status():
 
     node_list = [dict(default_status) for _ in range(5)]
     if not aws:
-        node_list[0]['ops'] = 400
+        node_list[0]["ops"] = 400
         raise tornado.gen.Return(node_list)
 
     kv_nodes = index = 0
     node_response, _ = yield get_url(NODE_URL)
 
-    for node_info in node_response['groups'][0]['nodes']:
-        if "kv" in node_info['services']:
+    for node_info in node_response["groups"][0]["nodes"]:
+        if "kv" in node_info["services"]:
             index = kv_nodes
             kv_nodes += 1
-        elif "n1ql" in node_info['services']:
+        elif "n1ql" in node_info["services"]:
             index = 3
-        elif "fts" in node_info['services']:
+        elif "fts" in node_info["services"]:
             index = 4
-        node_list[index]['hostname'] = node_info['hostname']
+        node_list[index]["hostname"] = node_info["hostname"]
         # First check for nodes that are fully fledged members of the cluster
         # And if they are KV nodes, check how many ops they're doing
-        if node_info['status'] == "healthy" and node_info[
-            'clusterMembership'] == "active":
-            node_list[index]['status'] = "ok"
-            if "kv" in node_info['services'] and 'cmd_get' in node_info[
-                'interestingStats']:
-                node_list[index]['ops'] = node_info['interestingStats']['cmd_get']
+        if (
+            node_info["status"] == "healthy"
+            and node_info["clusterMembership"] == "active"
+        ):
+            node_list[index]["status"] = "ok"
+            if (
+                "kv" in node_info["services"]
+                and "cmd_get" in node_info["interestingStats"]
+            ):
+                node_list[index]["ops"] = node_info["interestingStats"]["cmd_get"]
         # Check for cluster members that are unhealthy (in risk of being failed)
         # We will highlight these with a red border
-        elif node_info['clusterMembership'] == "active" and \
-                node_info['status'] == "unhealthy":
-            node_list[index]['status'] = "trouble"
+        elif (
+            node_info["clusterMembership"] == "active"
+            and node_info["status"] == "unhealthy"
+        ):
+            node_list[index]["status"] = "trouble"
         # Then, nodes that are either failed over, warming up or not rebalanced in
         # These will appear as faded
-        elif node_info['clusterMembership'] == "inactiveFailed" or \
-                node_info['clusterMembership'] == "inactiveAdded" or \
-                (node_info['clusterMembership'] == "active" and
-                 node_info['status'] == "warmup"):
-            node_list[index]['status'] = "dormant"
+        elif (
+            node_info["clusterMembership"] == "inactiveFailed"
+            or node_info["clusterMembership"] == "inactiveAdded"
+            or (
+                node_info["clusterMembership"] == "active"
+                and node_info["status"] == "warmup"
+            )
+        ):
+            node_list[index]["status"] = "dormant"
         # Any other status we'll just hide
         else:
-            node_list[index]['status'] = "out"
+            node_list[index]["status"] = "out"
     raise tornado.gen.Return(node_list)
 
 
@@ -121,11 +138,11 @@ def fts_nodes():
     response, node = yield get_url(SERVICE_URL)
     fts_nodes = []
     for node_info in response["nodesExt"]:
-        if 'fts' in node_info['services']:
-            if 'thisNode' in node_info and node_info['thisNode']:
+        if "fts" in node_info["services"]:
+            if "thisNode" in node_info and node_info["thisNode"]:
                 fts_nodes.append(strip_host(node))
             else:
-                fts_nodes.append(strip_host(node_info['hostname']))
+                fts_nodes.append(strip_host(node_info["hostname"]))
 
     raise tornado.gen.Return(fts_nodes)
 
@@ -138,8 +155,7 @@ def fts_enabled():
         raise tornado.gen.Return(False)
 
     try:
-        yield get_url(FTS_URL, host_list=nodes_to_query,
-                      raise_exception=True)
+        yield get_url(FTS_URL, host_list=nodes_to_query, raise_exception=True)
     except Exception:
         raise tornado.gen.Return(False)
     else:
@@ -149,9 +165,13 @@ def fts_enabled():
 @tornado.gen.coroutine
 def n1ql_enabled():
     index_response, _ = yield get_url(INDEX_URL)
-    raise tornado.gen.Return('indexes' in index_response and any(
-        index['index'] == 'category' and index['status'] == 'Ready' for index
-        in index_response['indexes']))
+    raise tornado.gen.Return(
+        "indexes" in index_response
+        and any(
+            index["index"] == "category" and index["status"] == "Ready"
+            for index in index_response["indexes"]
+        )
+    )
 
 
 @tornado.gen.coroutine
