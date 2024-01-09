@@ -70,9 +70,9 @@ class ExchangeHandler(tornado.web.RequestHandler):
     @tornado.gen.coroutine
     def get(self):
         company_list = default_collection.get(settings.PRODUCT_LIST)
-        print(f"company_list: {company_list}")
+        #print(f"company_list: {company_list}")
         stocks = default_collection.get_multi(company_list.value["symbols"])
-        print(f"stocks: {stocks}")
+        #print(f"stocks: {stocks}")
         result = cluster.query(
             "SELECT distinct sector from {} where sector IS NOT MISSING".format(
                 bucket_name
