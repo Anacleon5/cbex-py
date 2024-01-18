@@ -7,11 +7,11 @@ FTS_INDEX_NAME = "cbex"
 # Stock file model
 STOCKS_FILE = "stocks.json"
 # The list of nodes
-CLUSTER_NODES = ["localhost"]
+CLUSTER_NODES = ["n.n.n.n","n.n.n.n","n.n.n.n"]
 # Exposed web port e.g. 8888 or 80
-WEB_PORT = 8888
+WEB_PORT = 8080
 # Whether the current cluster is on AWS
-AWS = False
+AWS = True
 # Username of the data user
 USERNAME = "Administrator"
 # Password of the data user
@@ -35,3 +35,5 @@ FLAVOR = "stocks"
 TIMEOUT = 5
 # Default RAM Quota
 BUCKET_RAM_QUOTA = 1024
+
+
