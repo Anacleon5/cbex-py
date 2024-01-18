@@ -7,7 +7,7 @@ FTS_INDEX_NAME = "cbex"
 # Stock file model
 STOCKS_FILE = "stocks.json"
 # The list of nodes
-CLUSTER_NODES = ["n.n.n.n","n.n.n.n","n.n.n.n"]
+CLUSTER_NODES = ["10.2.1.181","10.2.2.153","10.2.3.25"]
 # Exposed web port e.g. 8888 or 80
 WEB_PORT = 8080
 # Whether the current cluster is on AWS
